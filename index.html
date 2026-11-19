@@ -1,0 +1,508 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>お見合いスポットガイド | Code For Marriage</title>
+<meta name="description" content="山手線の駅からお見合いに使えるホテルラウンジ・カフェを探せるほか、提携フォトスタジオのプランを比較できます。">
+<link rel="icon" href="logo.png">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<style>
+:root{
+  --bg:#fafaf7; --card:#fff; --ink:#1d1d1b; --sub:#6b6b66; --line:#e6e5df;
+  --y:#f5c400; --y-soft:#fff6cc; --yamanote:#80c241; --ink-soft:#f1f1ec; --accent:#1d1d1b;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:"Hiragino Sans","Noto Sans JP","Yu Gothic UI","Meiryo",sans-serif;-webkit-text-size-adjust:100%}
+a{color:inherit}
+button{font:inherit;color:inherit}
+.wrap{max-width:1080px;margin:0 auto;padding:0 16px}
+
+/* header */
+header.site{background:#fff;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:1000}
+header.site .wrap{display:flex;align-items:center;gap:12px;height:60px}
+header.site img{height:22px;width:auto;display:block}
+header.site .ttl{font-size:13px;color:var(--sub);border-left:1px solid var(--line);padding-left:12px;white-space:nowrap}
+header.site .back{margin-left:auto;font-size:13px;text-decoration:none;border:1px solid var(--line);border-radius:999px;padding:6px 12px;white-space:nowrap}
+header.site .back:hover{background:var(--ink-soft)}
+
+.hero{padding:28px 0 8px}
+.hero h1{font-size:clamp(22px,4vw,30px);margin:0 0 6px;letter-spacing:.02em}
+.hero h1 .mk{background:linear-gradient(transparent 62%,var(--y) 62%)}
+.hero p{margin:0;color:var(--sub);font-size:14px;line-height:1.7}
+
+.tabs{display:flex;gap:8px;margin:20px 0 18px;border-bottom:1px solid var(--line)}
+.tabs button{background:none;border:0;border-bottom:3px solid transparent;padding:10px 4px 9px;margin-right:14px;font-weight:700;font-size:15px;cursor:pointer;color:var(--sub)}
+.tabs button[aria-selected=true]{color:var(--ink);border-bottom-color:var(--y)}
+.panel[hidden]{display:none}
+
+/* station picker */
+.picker{display:grid;grid-template-columns:minmax(0,360px) 1fr;gap:20px;align-items:start}
+.ring{background:#fff;border:1px solid var(--line);border-radius:16px;padding:10px}
+.ring svg{width:100%;height:auto;display:block}
+.ring .st{cursor:pointer}
+.ring .st circle{fill:#fff;stroke:var(--yamanote);stroke-width:2.2;transition:r .15s}
+.ring .st text{font-size:10.5px;fill:var(--ink);paint-order:stroke;stroke:#fff;stroke-width:3px}
+.ring .st:hover circle,.ring .st:focus circle{r:7}
+.ring .st.on circle{fill:var(--ink);stroke:var(--ink);r:7.5}
+.ring .st.on text{font-weight:700}
+.ring .st:focus{outline:none}
+.ring .cnt{font-size:9px;fill:var(--sub)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.chips button{border:1px solid var(--line);background:#fff;border-radius:999px;padding:6px 11px;font-size:13px;cursor:pointer}
+.chips button.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+.chips button .n{font-size:11px;color:var(--sub);margin-left:3px}
+.chips button.on .n{color:#ddd}
+
+.result h2{margin:0 0 2px;font-size:20px;display:flex;align-items:center;gap:8px}
+.result h2 .dot{width:14px;height:14px;border-radius:50%;border:3px solid var(--yamanote);display:inline-block}
+.result .lead{color:var(--sub);font-size:13px;margin:0 0 12px}
+#map{height:300px;border-radius:14px;border:1px solid var(--line);z-index:1}
+.empty{padding:40px 16px;text-align:center;color:var(--sub);background:#fff;border:1px dashed var(--line);border-radius:14px;font-size:14px;line-height:1.8}
+
+.cards{display:grid;gap:10px;margin-top:14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 14px 12px;display:grid;grid-template-columns:28px 1fr;gap:4px 10px}
+.card .no{grid-row:span 3;width:26px;height:26px;border-radius:50%;background:var(--ink);color:#fff;display:grid;place-items:center;font-size:13px;font-weight:700}
+.card.far .no{background:#9a9a94}
+.card h3{margin:0;font-size:15.5px;line-height:1.45}
+.meta{display:flex;flex-wrap:wrap;gap:6px;font-size:12px}
+.tag{border-radius:6px;padding:2px 7px;background:var(--ink-soft);white-space:nowrap}
+.tag.walk{background:var(--y-soft);font-weight:700}
+.tag.ok{background:#e6f4e0;color:#2f6a1c}
+.tag.ng{background:#f6e9e6;color:#8a3a24}
+.tag.src{background:transparent;border:1px solid var(--line);color:var(--sub)}
+.card .memo{font-size:13px;color:#3d3d3a;line-height:1.65;margin:2px 0 0}
+.card .acts{grid-column:2;display:flex;gap:8px;margin-top:6px;flex-wrap:wrap}
+.btn{display:inline-flex;align-items:center;gap:5px;font-size:12.5px;text-decoration:none;border:1px solid var(--line);border-radius:8px;padding:6px 10px;background:#fff;cursor:pointer}
+.btn:hover{background:var(--ink-soft)}
+.btn.pri{background:var(--ink);color:#fff;border-color:var(--ink)}
+.divider{font-size:12px;color:var(--sub);margin:8px 0 0;display:flex;align-items:center;gap:8px}
+.divider::after{content:"";flex:1;border-top:1px dashed var(--line)}
+
+.notice{font-size:12px;color:var(--sub);line-height:1.7;margin:18px 0 0;padding:12px 14px;background:#fff;border:1px solid var(--line);border-radius:12px}
+
+/* studios */
+.filters{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;background:#fff;border:1px solid var(--line);border-radius:14px;padding:12px 14px}
+.fg{display:flex;align-items:center;gap:6px;font-size:13px;flex-wrap:wrap}
+.fg > span{color:var(--sub);font-size:12px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;overflow:hidden}
+.seg button{border:0;background:#fff;padding:6px 12px;font-size:13px;cursor:pointer}
+.seg button.on{background:var(--ink);color:#fff}
+select{font:inherit;font-size:13px;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:#fff}
+label.ck{display:inline-flex;align-items:center;gap:5px;font-size:13px;cursor:pointer}
+.count{font-size:13px;color:var(--sub);margin:14px 0 8px}
+
+.plans{display:grid;gap:10px}
+.studio{background:#fff;border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.studio .hd{padding:12px 14px;display:flex;gap:10px;align-items:flex-start;border-bottom:1px solid var(--line)}
+.studio .hd h3{margin:0;font-size:15.5px}
+.studio .hd .acc{font-size:12px;color:var(--sub);margin-top:2px}
+.studio .hd .cp{font-size:12.5px;margin-top:4px;color:#3d3d3a}
+.studio .area{margin-left:auto;font-size:12px;background:var(--y-soft);border-radius:6px;padding:3px 8px;white-space:nowrap}
+.plan{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;padding:10px 14px;border-top:1px solid var(--ink-soft)}
+.plan:first-of-type{border-top:0}
+.plan .pn{font-size:14px;font-weight:700;line-height:1.4}
+.plan .pd{font-size:12px;color:var(--sub);margin-top:3px;line-height:1.5}
+.plan .feat{display:flex;gap:5px;flex-wrap:wrap;margin-top:5px}
+.plan .feat .tag{font-size:11px}
+.price{text-align:right;white-space:nowrap}
+.price .reg{font-size:12px;color:var(--sub);text-decoration:line-through}
+.price .ibj{font-size:18px;font-weight:800}
+.price .ibj small{font-size:11px;font-weight:400;color:var(--sub)}
+.price .lbl{font-size:10.5px;background:var(--y);border-radius:4px;padding:1px 5px;font-weight:700}
+.plan input[type=checkbox]{width:18px;height:18px;accent-color:var(--ink);cursor:pointer}
+
+.cmpbar{position:fixed;left:0;right:0;bottom:0;background:var(--ink);color:#fff;z-index:1100;transform:translateY(110%);transition:transform .2s}
+.cmpbar.show{transform:none}
+.cmpbar .wrap{display:flex;align-items:center;gap:10px;height:58px}
+.cmpbar .sel{font-size:13px;flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.cmpbar button{border:0;border-radius:8px;padding:8px 14px;cursor:pointer;font-size:13px}
+.cmpbar .go{background:var(--y);color:var(--ink);font-weight:700}
+.cmpbar .clr{background:transparent;color:#ccc;border:1px solid #555}
+
+dialog{border:0;border-radius:16px;padding:0;width:min(960px,calc(100vw - 24px));max-height:calc(100vh - 40px)}
+dialog::backdrop{background:rgba(0,0,0,.45)}
+.dlg-hd{display:flex;align-items:center;padding:14px 16px;border-bottom:1px solid var(--line);position:sticky;top:0;background:#fff}
+.dlg-hd h3{margin:0;font-size:16px}
+.dlg-hd button{margin-left:auto;border:0;background:var(--ink-soft);border-radius:8px;padding:6px 12px;cursor:pointer}
+.cmp-scroll{overflow-x:auto;padding:0 0 8px}
+table.cmp{border-collapse:collapse;width:100%;min-width:560px;font-size:13px}
+table.cmp th,table.cmp td{border-bottom:1px solid var(--line);padding:10px 12px;text-align:left;vertical-align:top;line-height:1.55}
+table.cmp th{background:var(--bg);font-weight:600;color:var(--sub);width:110px;white-space:nowrap;position:sticky;left:0}
+table.cmp td.best{background:var(--y-soft)}
+table.cmp .big{font-size:18px;font-weight:800}
+
+footer{margin:40px 0 0;padding:24px 0 90px;border-top:1px solid var(--line);font-size:12px;color:var(--sub)}
+footer .wrap{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center}
+footer img{height:16px}
+.staff-link{margin-left:auto;background:none;border:0;color:var(--sub);font-size:11px;cursor:pointer;text-decoration:underline;opacity:.6}
+dialog.small{width:min(380px,calc(100vw - 24px))}
+.staff-body{padding:14px 16px 16px;font-size:13px;line-height:1.6}
+.staff-body p{margin:0 0 10px}
+.staff-body input[type=password]{width:100%;font:inherit;font-size:15px;padding:9px 10px;border:1px solid var(--line);border-radius:8px;margin-bottom:10px}
+.staff-body .err{color:#b3261e}
+.staff-acts{display:flex;gap:8px;justify-content:flex-end;margin-top:6px}
+.staffbar{background:#fff3c4;border:1px solid var(--y);border-radius:12px;padding:10px 14px;font-size:13px;margin-bottom:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.staffbar[hidden]{display:none}
+.staffbar button{margin-left:auto;border:1px solid var(--ink);background:#fff;border-radius:8px;padding:5px 10px;cursor:pointer;font-size:12px}
+.tag.perk{background:var(--y-soft);font-weight:700}
+.price .lbl2{font-size:10.5px;color:var(--sub)}
+
+@media (max-width:760px){
+  .picker{grid-template-columns:1fr}
+  .ring{max-width:420px;margin:0 auto;width:100%}
+  header.site .ttl{display:none}
+  #map{height:240px}
+  .plan{grid-template-columns:auto 1fr;}
+  .plan .price{grid-column:2;text-align:left;display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
+}
+</style>
+</head>
+<body>
+<header class="site">
+  <div class="wrap">
+    <a href="https://cf-m.jp/" aria-label="Code For Marriage トップへ"><img src="logo.png" alt="CODE FOR MARRIAGE"></a>
+    <span class="ttl">お見合いスポットガイド</span>
+    <a class="back" href="https://cf-m.jp/">← 公式サイトへ</a>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="hero">
+    <h1><span class="mk">お見合い場所</span>と<span class="mk">プロフィール写真</span>、ここで決まる。</h1>
+    <p>山手線の駅を選ぶと、お見合いに使いやすいホテルラウンジやカフェが出てきます。<br>提携フォトスタジオのプラン比較もこちらから。</p>
+  </section>
+
+  <div class="tabs" role="tablist">
+    <button role="tab" id="tab-cafe" aria-controls="p-cafe" aria-selected="true">☕ お見合いカフェを探す</button>
+    <button role="tab" id="tab-photo" aria-controls="p-photo" aria-selected="false">📷 フォトスタジオを比較</button>
+  </div>
+
+  <!-- カフェ -->
+  <section class="panel" id="p-cafe" role="tabpanel" aria-labelledby="tab-cafe">
+    <div class="picker">
+      <div>
+        <div class="ring" id="ring" aria-label="山手線の駅を選ぶ"></div>
+        <div class="chips" id="chips"></div>
+      </div>
+      <div class="result" id="result">
+        <div class="empty">左の路線図から駅を選んでください。<br>どの駅でも、近くの候補を最低3件ご案内します。</div>
+      </div>
+    </div>
+    <p class="notice">
+      ※ 掲載情報は、IBJ加盟相談所で共有されているお見合い場所マップと、Code For Marriage の独自調査をもとにしています。営業時間・予約可否・混雑状況は変わることがあります。お見合い前に公式サイト等で最新情報をご確認ください。<br>
+      ※ 徒歩時間は駅からの直線距離をもとにした目安です。
+    </p>
+  </section>
+
+  <!-- フォトスタジオ -->
+  <section class="panel" id="p-photo" role="tabpanel" aria-labelledby="tab-photo" hidden>
+    <div class="staffbar" id="staffbar" hidden>🔓 スタッフ表示中：IBJ会員価格を表示しています（この画面を会員以外に見せないでください）<button id="staff-out">表示をやめる</button></div>
+    <div class="filters">
+      <div class="fg"><span>対象</span>
+        <div class="seg" id="f-g"><button data-v="W" class="on">女性</button><button data-v="M">男性</button></div>
+      </div>
+      <div class="fg"><span>ヘアメイク</span>
+        <select id="f-hm">
+          <option value="">こだわらない</option>
+          <option value="F">フルメイク付き</option>
+          <option value="any">メイク・お直し付き</option>
+          <option value="N">なし（撮影のみ）</option>
+        </select>
+      </div>
+      <div class="fg"><span>エリア</span><select id="f-area"><option value="">すべて</option></select></div>
+      <div class="fg"><label class="ck"><input type="checkbox" id="f-loc">屋外ロケ撮影</label></div>
+      <div class="fg" style="margin-left:auto"><span>並び順</span>
+        <select id="f-sort">
+          <option value="ibj">価格が安い順</option>
+          <option value="disc" data-staff>割引額が大きい順</option>
+          <option value="cuts">修整データが多い順</option>
+        </select>
+      </div>
+    </div>
+    <p class="count" id="count"></p>
+    <div class="plans" id="plans"></div>
+    <p class="notice" id="photo-note"></p>
+  </section>
+</main>
+
+<div class="cmpbar" id="cmpbar"><div class="wrap">
+  <div class="sel" id="cmp-sel"></div>
+  <button class="clr" id="cmp-clr">クリア</button>
+  <button class="go" id="cmp-go">並べて比較</button>
+</div></div>
+
+<dialog id="dlg">
+  <div class="dlg-hd"><h3>プラン比較</h3><button id="dlg-x">閉じる</button></div>
+  <div class="cmp-scroll" id="cmp-body"></div>
+</dialog>
+
+<footer><div class="wrap">
+  <img src="logo.png" alt="">
+  <span>ITエンジニア向け結婚相談所 Code For Marriage</span>
+  <a href="https://cf-m.jp/">公式サイト</a>
+  <button class="staff-link" id="staff-in">スタッフ用</button>
+</div></footer>
+
+<dialog id="dlg-staff" class="small">
+  <form method="dialog" id="staff-form">
+    <div class="dlg-hd"><h3>スタッフ用の表示</h3></div>
+    <div class="staff-body">
+      <p>パスワードを入れると、提携フォトスタジオのIBJ会員価格が表示されます。</p>
+      <input type="password" id="staff-pass" autocomplete="current-password" placeholder="パスワード" required>
+      <label class="ck"><input type="checkbox" id="staff-keep">このブラウザで記憶する</label>
+      <p class="err" id="staff-err" hidden>パスワードが違います。</p>
+      <div class="staff-acts"><button type="button" class="btn" id="staff-cancel">やめる</button><button type="submit" class="btn pri" id="staff-ok">表示する</button></div>
+    </div>
+  </form>
+</dialog>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="cafes.js"></script>
+<script src="studios.js"></script>
+<script src="member-prices.enc.js"></script>
+<script>
+(function(){
+"use strict";
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const yen=n=>n==null?"—":n.toLocaleString("ja-JP")+"円";
+
+/* ---------- tabs ---------- */
+const tabs=[["tab-cafe","p-cafe"],["tab-photo","p-photo"]];
+function showTab(id,push){
+  tabs.forEach(([t,p])=>{const on=t===id;$("#"+t).setAttribute("aria-selected",on);$("#"+p).hidden=!on;});
+  if(id==="tab-cafe"&&map) setTimeout(()=>map.invalidateSize(),50);
+  if(push) history.replaceState(null,"",id==="tab-photo"?"#photo":(curStation?"#st="+encodeURIComponent(curStation):"#"));
+}
+tabs.forEach(([t])=>$("#"+t).addEventListener("click",()=>showTab(t,true)));
+
+/* ---------- cafes ---------- */
+const ST=window.STATIONS, CAFES=window.CAFES;
+const R=6371e3, rad=x=>x*Math.PI/180;
+function dist(a,b,c,d){const p=rad(c-a),q=rad(d-b);const h=Math.sin(p/2)**2+Math.cos(rad(a))*Math.cos(rad(c))*Math.sin(q/2)**2;return 2*R*Math.asin(Math.sqrt(h));}
+const NEAR=1000, MIN=3, MAXSHOW=10;
+function candidates(st){
+  const all=CAFES.map(c=>({...c,d:dist(st.lat,st.lng,c.lat,c.lng)})).sort((a,b)=>a.d-b.d);
+  const near=all.filter(c=>c.d<=NEAR).slice(0,MAXSHOW);
+  const far=near.length<MIN?all.filter(c=>c.d>NEAR).slice(0,MIN-near.length):[];
+  return {near,far};
+}
+const nearestSt=c=>ST.map(s=>({name:s.name,d:dist(s.lat,s.lng,c.lat,c.lng)})).sort((a,b)=>a.d-b.d)[0];
+const walkMin=d=>Math.max(1,Math.round(d*1.25/80));
+const counts={}; ST.forEach(s=>counts[s.name]=candidates(s).near.length);
+
+// ring
+(function(){
+  const W=360,H=380,cx=180,cy=192,rx=128,ry=150,n=ST.length;
+  let g=`<svg viewBox="0 0 ${W} ${H}" role="group"><ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" fill="none" stroke="var(--yamanote)" stroke-width="7" opacity=".9"/>`;
+  g+=`<text x="${cx}" y="${cy-6}" text-anchor="middle" font-size="15" font-weight="700" fill="var(--ink)">JR山手線</text><text x="${cx}" y="${cy+14}" text-anchor="middle" font-size="11" fill="var(--sub)">駅をタップ</text>`;
+  ST.forEach((s,i)=>{
+    const a=s.ang*Math.PI/180; const x=cx+rx*Math.sin(a), y=cy-ry*Math.cos(a);
+    const right=Math.sin(a)>0.15, left=Math.sin(a)<-0.15;
+    const tx=right?x+11:left?x-11:x, ty=(!right&&!left)?(Math.cos(a)>0?y-12:y+20):y+4;
+    const anc=right?"start":left?"end":"middle";
+    g+=`<g class="st" data-st="${esc(s.name)}" tabindex="0" role="button" aria-label="${esc(s.name)}駅"><circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="5.5"/><text x="${tx.toFixed(1)}" y="${ty.toFixed(1)}" text-anchor="${anc}">${esc(s.name)}</text></g>`;
+  });
+  g+="</svg>";
+  $("#ring").innerHTML=g;
+  $("#ring").addEventListener("click",e=>{const t=e.target.closest(".st");if(t)pick(t.dataset.st,true);});
+  $("#ring").addEventListener("keydown",e=>{const t=e.target.closest(".st");if(t&&(e.key==="Enter"||e.key===" ")){e.preventDefault();pick(t.dataset.st,true);}});
+  $("#chips").innerHTML=ST.map(s=>`<button data-st="${esc(s.name)}">${esc(s.name)}<span class="n">${counts[s.name]||""}</span></button>`).join("");
+  $("#chips").addEventListener("click",e=>{const b=e.target.closest("button");if(b)pick(b.dataset.st,true);});
+})();
+
+let map=null, layer=null, curStation=null;
+function ensureMap(){
+  if(map||!window.L) return;
+  map=L.map("map",{scrollWheelZoom:false});
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19,attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'}).addTo(map);
+  layer=L.layerGroup().addTo(map);
+}
+const TYPE={hotel:"ホテルラウンジ",kissa:"喫茶店",cafe:"カフェ",ibj:"IBJ Café"};
+function rsvTag(r){
+  if(!r) return "";
+  if(/不可|なし|無/.test(r)&&!/可能|可。|可\b/.test(r.replace(/不可/g,""))) return `<span class="tag ng">予約不可</span>`;
+  if(/可/.test(r)) return `<span class="tag ok">予約可</span>`;
+  return "";
+}
+function gmap(c){return "https://www.google.com/maps/search/?api=1&query="+encodeURIComponent(c.name+" "+(c.addr||""));}
+function card(c,i,far){
+  return `<article class="card${far?" far":""}" data-i="${i}">
+    <div class="no">${i+1}</div>
+    <h3>${esc(c.name)}</h3>
+    <div class="meta"><span class="tag walk">徒歩約${walkMin(c.d)}分</span>${(()=>{const n=nearestSt(c);return n.name!==curStation?`<span class="tag">${esc(n.name)}駅から徒歩約${walkMin(n.d)}分</span>`:"";})()}<span class="tag">${esc(TYPE[c.type]||"カフェ")}</span>${rsvTag(c.reserve)}<span class="tag src">${c.src==="ibj"?"IBJマップ掲載":"CFM調べ"}</span></div>
+    ${c.memo?`<p class="memo">${esc(c.memo)}</p>`:""}
+    <div class="acts">
+      <a class="btn pri" href="${gmap(c)}" target="_blank" rel="noopener">Googleマップで見る</a>
+      ${c.url?`<a class="btn" href="${esc(c.url)}" target="_blank" rel="noopener">公式・予約ページ</a>`:""}
+    </div>
+  </article>`;
+}
+function pick(name,push){
+  const st=ST.find(s=>s.name===name); if(!st) return;
+  curStation=name;
+  document.querySelectorAll(".ring .st").forEach(e=>e.classList.toggle("on",e.dataset.st===name));
+  document.querySelectorAll("#chips button").forEach(e=>e.classList.toggle("on",e.dataset.st===name));
+  const {near,far}=candidates(st);
+  const list=near.concat(far);
+  $("#result").innerHTML=`<h2><span class="dot"></span>${esc(name)}駅</h2>
+    <p class="lead">${near.length?`駅から約1km圏内に ${near.length} 件`:"駅から1km圏内の登録はまだありません"}${far.length?`。近隣エリアの候補を ${far.length} 件あわせて表示しています`:""}。</p>
+    <div id="map"></div>
+    <div class="cards">${near.map((c,i)=>card(c,i,false)).join("")}
+    ${far.length?`<div class="divider">少し足をのばした候補</div>`+far.map((c,i)=>card(c,near.length+i,true)).join(""):""}</div>`;
+  map=null; ensureMap();
+  if(map){
+    const stIcon=L.divIcon({className:"",html:'<div style="width:18px;height:18px;border-radius:50%;background:#fff;border:4px solid #80c241;box-shadow:0 0 0 2px #fff"></div>',iconSize:[18,18],iconAnchor:[9,9]});
+    L.marker([st.lat,st.lng],{icon:stIcon,title:name+"駅"}).addTo(layer).bindTooltip(name+"駅");
+    const pts=[[st.lat,st.lng]];
+    list.forEach((c,i)=>{
+      const far2=i>=near.length;
+      const ic=L.divIcon({className:"",html:`<div style="width:24px;height:24px;border-radius:50%;background:${far2?"#9a9a94":"#1d1d1b"};color:#fff;display:grid;place-items:center;font:700 12px sans-serif;border:2px solid #f5c400">${i+1}</div>`,iconSize:[24,24],iconAnchor:[12,12]});
+      L.marker([c.lat,c.lng],{icon:ic,title:c.name}).addTo(layer).bindPopup(`<b>${esc(c.name)}</b><br>徒歩約${walkMin(c.d)}分`);
+      pts.push([c.lat,c.lng]);
+    });
+    map.fitBounds(pts,{padding:[28,28],maxZoom:16});
+  }
+  if(push){history.replaceState(null,"","#st="+encodeURIComponent(name)); if(innerWidth<760) $("#result").scrollIntoView({behavior:"smooth",block:"start"});}
+}
+
+/* ---------- studios ---------- */
+const S=window.STUDIOS;
+const HM={F:"フルメイク",P:"メイク・お直し",H:"ヘアのみ",N:"ヘアメイクなし"};
+const fs={g:"W",hm:"",area:"",loc:false,sort:"ibj"};
+const areas=[...new Set(S.map(s=>s.area))];
+$("#f-area").insertAdjacentHTML("beforeend",areas.map(a=>`<option>${esc(a)}</option>`).join(""));
+let staff=false;
+const priceOf=p=>staff?(p.ibj??p.reg):p.reg;
+function setNote(){
+  $("#photo-note").innerHTML=staff
+    ?`※ 料金は税込、${esc(window.STUDIO_DATA_DATE)} 時点。「会員価格」は IBJ 提携割引の適用後の金額です（スタッフ表示）。土日祝の追加料金・オプションはスタジオにより異なります。`
+    :`※ 料金は税込、${esc(window.STUDIO_DATA_DATE)} 時点の通常価格です。掲載スタジオはすべて IBJ 提携スタジオで、Code For Marriage 会員の方は<b>会員向けの優待価格</b>でご利用いただけます。優待価格とご予約は担当カウンセラーへお問い合わせください。`;
+  document.querySelectorAll("#f-sort option[data-staff]").forEach(o=>{o.hidden=!staff;o.disabled=!staff;});
+  if(!staff&&fs.sort==="disc"){fs.sort="ibj";$("#f-sort").value="ibj";}
+  $("#staffbar").hidden=!staff;
+}
+const sel=new Map(); // key -> {s,p}
+const key=(s,p)=>s.id+"|"+p.name;
+function planOk(p){
+  if(!(p.g==="A"||p.g===fs.g)) return false;
+  if(fs.hm==="F"&&p.hm!=="F") return false;
+  if(fs.hm==="any"&&!(p.hm==="F"||p.hm==="P")) return false;
+  if(fs.hm==="N"&&p.hm!=="N") return false;
+  if(fs.loc&&!p.loc) return false;
+  return true;
+}
+function renderPlans(){
+  let rows=S.filter(s=>!fs.area||s.area===fs.area).map(s=>({s,ps:s.plans.filter(planOk)})).filter(r=>r.ps.length);
+  const metric=p=>fs.sort==="ibj"?(priceOf(p)??Infinity):fs.sort==="disc"?-(p.reg&&p.ibj?p.reg-p.ibj:0):-(p.cuts||0);
+  rows.forEach(r=>r.ps.sort((a,b)=>metric(a)-metric(b)));
+  rows.sort((a,b)=>metric(a.ps[0])-metric(b.ps[0]));
+  const np=rows.reduce((n,r)=>n+r.ps.length,0);
+  $("#count").textContent=`${rows.length} スタジオ・${np} プラン　｜　チェックを入れると最大3つまで並べて比較できます`;
+  $("#plans").innerHTML=rows.map(({s,ps})=>`<div class="studio">
+    <div class="hd"><div><h3>${esc(s.name)}</h3><div class="acc">📍 ${esc(s.access)}</div><div class="cp">${esc(s.catch)}</div></div><span class="area">${esc(s.area)}</span></div>
+    ${ps.map(p=>{const k=key(s,p);return `<label class="plan">
+      <input type="checkbox" data-k="${esc(k)}" ${sel.has(k)?"checked":""} aria-label="${esc(s.name+" "+p.name)}を比較に追加">
+      <div><div class="pn">${esc(p.name)}</div><div class="pd">${esc(p.note)}</div>
+        <div class="feat"><span class="tag">${HM[p.hm]}</span>${p.cuts?`<span class="tag">修整データ${p.cuts}カット</span>`:""}${p.loc?`<span class="tag">ロケ撮影</span>`:""}${p.g==="A"?`<span class="tag">男女共通</span>`:""}</div></div>
+      <div class="price">${staff
+        ?`${p.reg&&p.reg!==p.ibj?`<div class="reg">${yen(p.reg)}</div>`:""}<div class="ibj"><span class="lbl">会員価格</span> ${yen(p.ibj)}</div>`
+        :p.reg?`<div class="lbl2">通常価格</div><div class="ibj">${yen(p.reg)}</div><div><span class="tag perk">会員優待あり</span></div>`
+        :`<div class="ibj" style="font-size:13px">会員専用プラン</div><div class="lbl2">料金はカウンセラーへ</div>`}</div>
+    </label>`}).join("")}
+  </div>`).join("")||`<div class="empty">条件に合うプランがありません。条件をゆるめてお試しください。</div>`;
+}
+$("#plans").addEventListener("change",e=>{
+  const cb=e.target.closest("input[type=checkbox]"); if(!cb) return;
+  const k=cb.dataset.k;
+  if(cb.checked){
+    if(sel.size>=3){cb.checked=false;alert("比較できるのは3プランまでです。");return;}
+    const [sid,pn]=[k.slice(0,k.indexOf("|")),k.slice(k.indexOf("|")+1)];
+    const s=S.find(x=>x.id===sid); sel.set(k,{s,p:s.plans.find(x=>x.name===pn)});
+  } else sel.delete(k);
+  updBar();
+});
+function updBar(){
+  $("#cmpbar").classList.toggle("show",sel.size>0);
+  $("#cmp-sel").textContent=`${sel.size}件選択中：`+[...sel.values()].map(v=>v.s.name.replace(/ヘアメイク＆フォトスタジオ |メイクアップサロン /,"")).join(" / ");
+  $("#cmp-go").disabled=sel.size<2; $("#cmp-go").style.opacity=sel.size<2?.5:1;
+}
+$("#cmp-clr").onclick=()=>{sel.clear();updBar();renderPlans();};
+$("#cmp-go").onclick=()=>{
+  const v=[...sel.values()];
+  const minI=Math.min(...v.map(x=>priceOf(x.p)??Infinity)), maxC=Math.max(...v.map(x=>x.p.cuts||0));
+  const row=(h,f)=>`<tr><th>${h}</th>${v.map(f).join("")}</tr>`;
+  const best=x=>priceOf(x.p)!=null&&priceOf(x.p)===minI;
+  $("#cmp-body").innerHTML=`<table class="cmp">
+    ${row("スタジオ",x=>`<td><b>${esc(x.s.name)}</b><br><span style="color:var(--sub);font-size:12px">${esc(x.s.area)}</span></td>`)}
+    ${row("プラン",x=>`<td>${esc(x.p.name)}</td>`)}
+    ${staff
+      ?row("会員価格",x=>`<td class="${best(x)?"best":""}"><span class="big">${yen(x.p.ibj)}</span>${best(x)?"<br><small>最安</small>":""}</td>`)
+        +row("通常価格",x=>`<td>${yen(x.p.reg)}</td>`)
+        +row("割引額",x=>`<td>${x.p.reg&&x.p.ibj?yen(x.p.reg-x.p.ibj):"—"}</td>`)
+      :row("通常価格",x=>`<td class="${best(x)?"best":""}"><span class="big">${x.p.reg?yen(x.p.reg):"—"}</span>${best(x)?"<br><small>最安</small>":""}</td>`)
+        +row("会員優待",x=>`<td>${x.p.reg?"あり（優待価格はカウンセラーへ）":"会員専用プラン"}</td>`)}
+    ${row("ヘアメイク",x=>`<td>${HM[x.p.hm]}</td>`)}
+    ${row("修整データ",x=>`<td class="${x.p.cuts&&x.p.cuts===maxC?"best":""}">${x.p.cuts?x.p.cuts+"カット":"スタジオに確認"}</td>`)}
+    ${row("ロケ撮影",x=>`<td>${x.p.loc?"あり":"—"}</td>`)}
+    ${row("内容",x=>`<td>${esc(x.p.note)}</td>`)}
+    ${row("アクセス",x=>`<td>${esc(x.s.access)}</td>`)}
+    ${row("特長",x=>`<td>${esc(x.s.catch)}</td>`)}
+  </table>`;
+  $("#dlg").showModal();
+};
+$("#dlg-x").onclick=()=>$("#dlg").close();
+$("#dlg").addEventListener("click",e=>{if(e.target===$("#dlg"))$("#dlg").close();});
+document.querySelectorAll("#f-g button").forEach(b=>b.onclick=()=>{document.querySelectorAll("#f-g button").forEach(x=>x.classList.toggle("on",x===b));fs.g=b.dataset.v;renderPlans();});
+$("#f-hm").onchange=e=>{fs.hm=e.target.value;renderPlans();};
+$("#f-area").onchange=e=>{fs.area=e.target.value;renderPlans();};
+$("#f-loc").onchange=e=>{fs.loc=e.target.checked;renderPlans();};
+$("#f-sort").onchange=e=>{fs.sort=e.target.value;renderPlans();};
+/* ---------- スタッフ表示（会員価格の復号） ---------- */
+const KEEP="cfm-omiai-staff";
+const ub64=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
+async function unlock(pass){
+  const E=window.MEMBER_ENC; if(!E||!crypto.subtle) throw new Error("unsupported");
+  const base=await crypto.subtle.importKey("raw",new TextEncoder().encode(pass),"PBKDF2",false,["deriveKey"]);
+  const key=await crypto.subtle.deriveKey({name:"PBKDF2",hash:"SHA-256",salt:ub64(E.salt),iterations:E.iter},base,{name:"AES-GCM",length:256},false,["decrypt"]);
+  const pt=await crypto.subtle.decrypt({name:"AES-GCM",iv:ub64(E.iv)},key,ub64(E.ct)); // パスワード違いはここで失敗
+  const data=JSON.parse(new TextDecoder().decode(pt));
+  S.forEach(s=>s.plans.forEach(p=>{const v=data.prices?.[s.id]?.[p.name];p.ibj=v==null?null:v;}));
+  staff=true; setNote(); renderPlans(); if(sel.size) updBar();
+}
+function lock(){
+  staff=false; S.forEach(s=>s.plans.forEach(p=>delete p.ibj));
+  try{localStorage.removeItem(KEEP);sessionStorage.removeItem(KEEP);}catch(e){}
+  setNote(); renderPlans();
+}
+$("#staff-in").onclick=()=>{$("#staff-err").hidden=true;$("#staff-pass").value="";$("#dlg-staff").showModal();$("#staff-pass").focus();};
+$("#staff-cancel").onclick=()=>$("#dlg-staff").close();
+$("#staff-form").addEventListener("submit",async e=>{
+  e.preventDefault();
+  const pass=$("#staff-pass").value.trim(); if(!pass) return;
+  $("#staff-ok").disabled=true; $("#staff-ok").textContent="確認中…";
+  try{
+    await unlock(pass);
+    try{($("#staff-keep").checked?localStorage:sessionStorage).setItem(KEEP,pass);}catch(e){}
+    $("#dlg-staff").close(); showTab("tab-photo",true);
+  }catch(err){ $("#staff-err").hidden=false; }
+  finally{ $("#staff-ok").disabled=false; $("#staff-ok").textContent="表示する"; }
+});
+$("#staff-out").onclick=lock;
+setNote(); renderPlans(); updBar();
+(async()=>{let p=null;try{p=localStorage.getItem(KEEP)||sessionStorage.getItem(KEEP);}catch(e){}
+  if(p){try{await unlock(p);}catch(e){lock();}}})();
+
+/* ---------- deep links: #st=新宿 / #photo ---------- */
+function route(){
+  const h=decodeURIComponent(location.hash.slice(1));
+  if(h==="photo") showTab("tab-photo",false);
+  else if(h.startsWith("st=")){ showTab("tab-cafe",false); if(h.slice(3)!==curStation) pick(h.slice(3),false); }
+}
+addEventListener("hashchange",route);
+route();
+})();
+</script>
+</body>
+</html>
