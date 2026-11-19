@@ -48,6 +48,13 @@ header.site .back:hover{background:var(--ink-soft)}
 .ring .st.on text{font-weight:700}
 .ring .st:focus{outline:none}
 .ring .cnt{font-size:9px;fill:var(--sub)}
+@media (min-width:761px){.picker-side{position:sticky;top:76px}}
+.pstation{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 12px}
+.pstation h2{margin:0;font-size:20px;display:flex;align-items:center;gap:8px}
+.pstation h2 .dot{width:14px;height:14px;border-radius:50%;border:3px solid var(--yamanote);display:inline-block}
+.pstation p{margin:0;color:var(--sub);font-size:13px;flex-basis:100%}
+.pstation button{border:1px solid var(--line);background:#fff;border-radius:999px;padding:4px 10px;font-size:12px;cursor:pointer}
+.studio .near{font-size:12px;font-weight:700;background:#e9f5df;color:#2f6a1c;border-radius:6px;padding:2px 7px;margin-top:5px;display:inline-block}
 .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
 .chips button{border:1px solid var(--line);background:#fff;border-radius:999px;padding:6px 11px;font-size:13px;cursor:pointer}
 .chips button.on{background:var(--ink);color:#fff;border-color:var(--ink)}
@@ -198,6 +205,13 @@ dialog.small{width:min(380px,calc(100vw - 24px))}
   <!-- フォトスタジオ -->
   <section class="panel" id="p-photo" role="tabpanel" aria-labelledby="tab-photo" hidden>
     <div class="staffbar" id="staffbar" hidden>🔓 スタッフ表示中：IBJ会員価格を表示しています（この画面を会員以外に見せないでください）<button id="staff-out">表示をやめる</button></div>
+    <div class="picker">
+      <div class="picker-side">
+        <div class="ring" id="ring2" aria-label="山手線の駅を選ぶ"></div>
+        <div class="chips" id="chips2"></div>
+      </div>
+      <div class="result">
+    <div class="pstation" id="pstation"></div>
     <div class="filters">
       <div class="fg"><span>対象</span>
         <div class="seg" id="f-g"><button data-v="W" class="on">女性</button><button data-v="M">男性</button></div>
@@ -222,6 +236,8 @@ dialog.small{width:min(380px,calc(100vw - 24px))}
     </div>
     <p class="count" id="count"></p>
     <div class="plans" id="plans"></div>
+      </div>
+    </div>
     <p class="notice" id="photo-note"></p>
   </section>
 </main>
@@ -273,7 +289,7 @@ const tabs=[["tab-cafe","p-cafe"],["tab-photo","p-photo"]];
 function showTab(id,push){
   tabs.forEach(([t,p])=>{const on=t===id;$("#"+t).setAttribute("aria-selected",on);$("#"+p).hidden=!on;});
   if(id==="tab-cafe"&&map) setTimeout(()=>map.invalidateSize(),50);
-  if(push) history.replaceState(null,"",id==="tab-photo"?"#photo":(curStation?"#st="+encodeURIComponent(curStation):"#"));
+  if(push) history.replaceState(null,"",id==="tab-photo"?(photoStation?"#photo="+encodeURIComponent(photoStation):"#photo"):(curStation?"#st="+encodeURIComponent(curStation):"#"));
 }
 tabs.forEach(([t])=>$("#"+t).addEventListener("click",()=>showTab(t,true)));
 
@@ -292,9 +308,9 @@ const nearestSt=c=>ST.map(s=>({name:s.name,d:dist(s.lat,s.lng,c.lat,c.lng)})).so
 const walkMin=d=>Math.max(1,Math.round(d*1.25/80));
 const counts={}; ST.forEach(s=>counts[s.name]=candidates(s).near.length);
 
-// ring
-(function(){
-  const W=360,H=380,cx=180,cy=192,rx=128,ry=150,n=ST.length;
+// 山手線の路線図（カフェ・スタジオで共用）
+function makeRing(ringEl,chipsEl,countOf,onPick){
+  const W=360,H=380,cx=180,cy=192,rx=128,ry=150;
   let g=`<svg viewBox="0 0 ${W} ${H}" role="group"><ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" fill="none" stroke="var(--yamanote)" stroke-width="7" opacity=".9"/>`;
   g+=`<text x="${cx}" y="${cy-6}" text-anchor="middle" font-size="15" font-weight="700" fill="var(--ink)">JR山手線</text><text x="${cx}" y="${cy+14}" text-anchor="middle" font-size="11" fill="var(--sub)">駅をタップ</text>`;
   ST.forEach((s,i)=>{
@@ -305,12 +321,17 @@ const counts={}; ST.forEach(s=>counts[s.name]=candidates(s).near.length);
     g+=`<g class="st" data-st="${esc(s.name)}" tabindex="0" role="button" aria-label="${esc(s.name)}駅"><circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="5.5"/><text x="${tx.toFixed(1)}" y="${ty.toFixed(1)}" text-anchor="${anc}">${esc(s.name)}</text></g>`;
   });
   g+="</svg>";
-  $("#ring").innerHTML=g;
-  $("#ring").addEventListener("click",e=>{const t=e.target.closest(".st");if(t)pick(t.dataset.st,true);});
-  $("#ring").addEventListener("keydown",e=>{const t=e.target.closest(".st");if(t&&(e.key==="Enter"||e.key===" ")){e.preventDefault();pick(t.dataset.st,true);}});
-  $("#chips").innerHTML=ST.map(s=>`<button data-st="${esc(s.name)}">${esc(s.name)}<span class="n">${counts[s.name]||""}</span></button>`).join("");
-  $("#chips").addEventListener("click",e=>{const b=e.target.closest("button");if(b)pick(b.dataset.st,true);});
-})();
+  ringEl.innerHTML=g;
+  ringEl.addEventListener("click",e=>{const t=e.target.closest(".st");if(t)onPick(t.dataset.st,true);});
+  ringEl.addEventListener("keydown",e=>{const t=e.target.closest(".st");if(t&&(e.key==="Enter"||e.key===" ")){e.preventDefault();onPick(t.dataset.st,true);}});
+  chipsEl.innerHTML=ST.map(s=>`<button data-st="${esc(s.name)}">${esc(s.name)}<span class="n">${countOf(s)||""}</span></button>`).join("");
+  chipsEl.addEventListener("click",e=>{const b=e.target.closest("button");if(b)onPick(b.dataset.st,true);});
+  return name=>{
+    ringEl.querySelectorAll(".st").forEach(e=>e.classList.toggle("on",e.dataset.st===name));
+    chipsEl.querySelectorAll("button").forEach(e=>e.classList.toggle("on",e.dataset.st===name));
+  };
+}
+const markCafe=makeRing($("#ring"),$("#chips"),s=>counts[s.name],(n,p)=>pick(n,p));
 
 let map=null, layer=null, curStation=null;
 function ensureMap(){
@@ -342,8 +363,7 @@ function card(c,i,far){
 function pick(name,push){
   const st=ST.find(s=>s.name===name); if(!st) return;
   curStation=name;
-  document.querySelectorAll(".ring .st").forEach(e=>e.classList.toggle("on",e.dataset.st===name));
-  document.querySelectorAll("#chips button").forEach(e=>e.classList.toggle("on",e.dataset.st===name));
+  markCafe(name);
   const {near,far}=candidates(st);
   const list=near.concat(far);
   $("#result").innerHTML=`<h2><span class="dot"></span>${esc(name)}駅</h2>
@@ -393,15 +413,44 @@ function planOk(p){
   if(fs.loc&&!p.loc) return false;
   return true;
 }
+/* 駅からスタジオを探す */
+const STUDIO_NEAR=1500;
+let photoStation=null;
+const stByName=n=>ST.find(s=>s.name===n);
+const studioCount=st=>S.filter(s=>dist(st.lat,st.lng,s.lat,s.lng)<=STUDIO_NEAR).length;
+const markPhoto=makeRing($("#ring2"),$("#chips2"),studioCount,(n,p)=>pickPhoto(n===photoStation&&p?null:n,p));
+function pickPhoto(name,push){
+  photoStation=stByName(name)?name:null;
+  markPhoto(photoStation);
+  renderPlans();
+  if(push){
+    history.replaceState(null,"",photoStation?"#photo="+encodeURIComponent(photoStation):"#photo");
+    if(photoStation&&innerWidth<760) $("#pstation").scrollIntoView({behavior:"smooth",block:"start"});
+  }
+}
+function renderStationHead(nNear){
+  $("#pstation").innerHTML=photoStation
+    ?`<h2><span class="dot"></span>${esc(photoStation)}駅</h2><button id="pst-clear">駅の指定を外す</button>
+      <p>${nNear?`駅から約1.5km以内のスタジオ ${nNear} 件を先に表示し、ほかのスタジオは近い順に並べています。`:"駅から約1.5km以内には提携スタジオがありません。近い順に並べています。"}</p>`
+    :`<p>左の路線図から駅を選ぶと、その駅に近いスタジオから順に並びます。</p>`;
+  const b=$("#pst-clear"); if(b) b.onclick=()=>pickPhoto(null,true);
+}
 function renderPlans(){
   let rows=S.filter(s=>!fs.area||s.area===fs.area).map(s=>({s,ps:s.plans.filter(planOk)})).filter(r=>r.ps.length);
   const metric=p=>fs.sort==="ibj"?(priceOf(p)??Infinity):fs.sort==="disc"?-(p.reg&&p.ibj?p.reg-p.ibj:0):-(p.cuts||0);
   rows.forEach(r=>r.ps.sort((a,b)=>metric(a)-metric(b)));
   rows.sort((a,b)=>metric(a.ps[0])-metric(b.ps[0]));
+  const st=photoStation&&stByName(photoStation);
+  if(st){
+    rows.forEach(r=>{r.d=dist(st.lat,st.lng,r.s.lat,r.s.lng);r.near=r.d<=STUDIO_NEAR;});
+    rows.sort((a,b)=>(b.near-a.near)||(a.near?metric(a.ps[0])-metric(b.ps[0]):a.d-b.d));
+  }
+  const nNear=st?rows.filter(r=>r.near).length:0;
+  renderStationHead(nNear);
   const np=rows.reduce((n,r)=>n+r.ps.length,0);
   $("#count").textContent=`${rows.length} スタジオ・${np} プラン　｜　チェックを入れると最大3つまで並べて比較できます`;
-  $("#plans").innerHTML=rows.map(({s,ps})=>`<div class="studio">
-    <div class="hd"><div><h3>${esc(s.name)}</h3><div class="acc">📍 ${esc(s.access)}</div><div class="cp">${esc(s.catch)}</div></div><span class="area">${esc(s.area)}</span></div>
+  $("#plans").innerHTML=rows.map((r,i)=>{const {s,ps}=r;return `${st&&!r.near&&(i===0||rows[i-1].near)?`<div class="divider">ほかのスタジオ（${esc(photoStation)}駅から近い順）</div>`:""}<div class="studio">
+    <div class="hd"><div><h3>${esc(s.name)}</h3><div class="acc">📍 ${esc(s.access)}</div><div class="cp">${esc(s.catch)}</div>${st&&r.near?`<span class="near">${esc(photoStation)}駅の近く</span>`:""}</div><span class="area">${esc(s.area)}</span></div>
     ${ps.map(p=>{const k=key(s,p);return `<label class="plan">
       <input type="checkbox" data-k="${esc(k)}" ${sel.has(k)?"checked":""} aria-label="${esc(s.name+" "+p.name)}を比較に追加">
       <div><div class="pn">${esc(p.name)}</div><div class="pd">${esc(p.note)}</div>
@@ -411,7 +460,7 @@ function renderPlans(){
         :p.reg?`<div class="lbl2">通常価格</div><div class="ibj">${yen(p.reg)}</div><div><span class="tag perk">会員優待あり</span></div>`
         :`<div class="ibj" style="font-size:13px">会員専用プラン</div><div class="lbl2">料金はカウンセラーへ</div>`}</div>
     </label>`}).join("")}
-  </div>`).join("")||`<div class="empty">条件に合うプランがありません。条件をゆるめてお試しください。</div>`;
+  </div>`}).join("")||`<div class="empty">条件に合うプランがありません。条件をゆるめてお試しください。</div>`;
 }
 $("#plans").addEventListener("change",e=>{
   const cb=e.target.closest("input[type=checkbox]"); if(!cb) return;
@@ -497,7 +546,7 @@ setNote(); renderPlans(); updBar();
 /* ---------- deep links: #st=新宿 / #photo ---------- */
 function route(){
   const h=decodeURIComponent(location.hash.slice(1));
-  if(h==="photo") showTab("tab-photo",false);
+  if(h==="photo"||h.startsWith("photo=")){ showTab("tab-photo",false); const n=h.startsWith("photo=")?h.slice(6):null; if(n!==photoStation) pickPhoto(n,false); }
   else if(h.startsWith("st=")){ showTab("tab-cafe",false); if(h.slice(3)!==curStation) pick(h.slice(3),false); }
 }
 addEventListener("hashchange",route);
